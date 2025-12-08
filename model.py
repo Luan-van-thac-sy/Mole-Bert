@@ -11,7 +11,7 @@ num_atom_type = 120 #including the extra mask tokens
 num_chirality_tag = 3
 
 num_bond_type = 6 #including aromatic and self-loop edge, and extra masked tokens
-num_bond_direction = 3 
+num_bond_direction = 3
 
 class GINConv(MessagePassing):
     """
@@ -19,8 +19,8 @@ class GINConv(MessagePassing):
 
     Args:
         emb_dim (int): dimensionality of embeddings for nodes and edges.
-        embed_input (bool): whether to embed input or not. 
-        
+        embed_input (bool): whether to embed input or not.
+
 
     See https://arxiv.org/abs/1810.00826
     """
@@ -60,7 +60,7 @@ class GINConv(MessagePassing):
 class GNNDecoder(torch.nn.Module):
     def __init__(self, hidden_dim, out_dim, JK = "last", drop_ratio = 0, gnn_type = "gin"):
         super().__init__()
-        self._dec_type = gnn_type 
+        self._dec_type = gnn_type
         if gnn_type == "gin":
             self.conv = GINConv(hidden_dim, out_dim, aggr = "add")
         elif gnn_type == "gcn":
@@ -70,8 +70,8 @@ class GNNDecoder(torch.nn.Module):
         else:
             raise NotImplementedError(f"{gnn_type}")
         self.dec_token = torch.nn.Parameter(torch.zeros([1, hidden_dim]))
-        self.enc_to_dec = torch.nn.Linear(hidden_dim, hidden_dim, bias=False)    
-        self.activation = torch.nn.PReLU() 
+        self.enc_to_dec = torch.nn.Linear(hidden_dim, hidden_dim, bias=False)
+        self.activation = torch.nn.PReLU()
         self.temp = 0.2
 
     def forward(self, x, edge_index, edge_attr):
@@ -346,7 +346,7 @@ class DiscreteGNN(torch.nn.Module):
     Output:
         node representations
     """
-    def __init__(self, num_layer, emb_dim, num_tokens, JK = "last", 
+    def __init__(self, num_layer, emb_dim, num_tokens, JK = "last",
         temperature = 0.9, drop_ratio = 0, gnn_type = "gin"):
         super(DiscreteGNN, self).__init__()
         self.num_layer = num_layer
@@ -378,13 +378,13 @@ class DiscreteGNN(torch.nn.Module):
                 self.gnns.append(GATConv(emb_dim))
             elif gnn_type == "graphsage":
                 self.gnns.append(GraphSAGEConv(emb_dim))
-        self.gnns.append(GINConv(emb_dim, emb_dim, aggr = "add"))    
+        self.gnns.append(GINConv(emb_dim, emb_dim, aggr = "add"))
 
         ###List of batchnorms
         self.batch_norms = torch.nn.ModuleList()
         for layer in range(num_layer - 1):
             self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
-        self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))        
+        self.batch_norms.append(torch.nn.BatchNorm1d(emb_dim))
 
     def forward(self, *argv):
         if len(argv) == 3:
@@ -444,7 +444,7 @@ class GNN_graphpred(torch.nn.Module):
         JK (str): last, concat, max or sum.
         graph_pooling (str): sum, mean, max, attention, set2set
         gnn_type: gin, gcn, graphsage, gat
-        
+
     See https://arxiv.org/abs/1810.00826
     JK-net: https://arxiv.org/abs/1806.03536
     """
@@ -487,7 +487,7 @@ class GNN_graphpred(torch.nn.Module):
             self.mult = 2
         else:
             self.mult = 1
-        
+
         if self.JK == "concat":
             self.graph_pred_linear = torch.nn.Linear(self.mult * (self.num_layer + 1) * self.emb_dim, self.num_tasks)
         else:

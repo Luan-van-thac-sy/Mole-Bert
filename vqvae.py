@@ -1,6 +1,7 @@
 import argparse
 from loader import MoleculeDataset
-from torch_geometric.data import DataLoader
+from torch_geometric.loader import DataLoader
+# from torch_geometric.data import DataLoader
 from functools import partial
 import torch
 from torch import nn, einsum
@@ -17,13 +18,13 @@ from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_poo
 from tensorboardX import SummaryWriter
 criterion = nn.CrossEntropyLoss()
 import timeit
-NUM_NODE_ATTR = 119 
+NUM_NODE_ATTR = 119
 NUM_NODE_CHIRAL = 4
 NUM_BOND_ATTR = 4
 
 class VectorQuantizer(nn.Module):
     """
-    VQ-VAE layer: Input any tensor to be quantized. 
+    VQ-VAE layer: Input any tensor to be quantized.
     Args:
         embedding_dim (int): the dimensionality of the tensors in the
         quantized space. Inputs to the modules must be in this format as well.
@@ -35,11 +36,11 @@ class VectorQuantizer(nn.Module):
         self.embedding_dim = embedding_dim
         self.num_embeddings = num_embeddings
         self.commitment_cost = commitment_cost
-        
+
         # initialize embeddings
         self.embeddings = nn.Embedding(self.num_embeddings, self.embedding_dim)
-        
-    def forward(self, x, e):    
+
+    def forward(self, x, e):
         encoding_indices = self.get_code_indices(x, e) # x: B * H, encoding_indices: B
         quantized = self.quantize(encoding_indices)
         # embedding loss: move the embeddings towards the encoder's output
@@ -50,7 +51,7 @@ class VectorQuantizer(nn.Module):
         # Straight Through Estimator
         quantized = e + (quantized - e).detach().contiguous()
         return quantized, loss
-    
+
     def get_code_indices(self, x, e):
         # x: N * 2  e: N * E
         atom_type = x[:, 0]
@@ -72,14 +73,14 @@ class VectorQuantizer(nn.Module):
             torch.sum(e[index_n] ** 2, dim=1, keepdim=True) +
             torch.sum(self.embeddings.weight[378: 433] ** 2, dim=1) -
             2. * torch.matmul(e[index_n], self.embeddings.weight[378: 433].t())
-        ) 
+        )
         encoding_indices[index_n] = torch.argmin(distances, dim=1) + 378
         # O:
         distances = (
             torch.sum(e[index_o] ** 2, dim=1, keepdim=True) +
             torch.sum(self.embeddings.weight[434: 488] ** 2, dim=1) -
             2. * torch.matmul(e[index_o], self.embeddings.weight[434: 488].t())
-        )   
+        )
         encoding_indices[index_o] = torch.argmin(distances, dim=1) + 434
 
         # Others:
@@ -87,17 +88,17 @@ class VectorQuantizer(nn.Module):
             torch.sum(e[index_others] ** 2, dim=1, keepdim=True) +
             torch.sum(self.embeddings.weight[489: 511] ** 2, dim=1) -
             2. * torch.matmul(e[index_others], self.embeddings.weight[489: 511].t())
-        ) 
+        )
         encoding_indices[index_others] = torch.argmin(distances, dim=1) + 489
 
         return encoding_indices
-    
+
     def quantize(self, encoding_indices):
         """Returns embedding tensor for a batch of indices."""
-        return self.embeddings(encoding_indices) 
+        return self.embeddings(encoding_indices)
 
     def from_pretrained(self, model_file):
-        self.load_state_dict(torch.load(model_file))     
+        self.load_state_dict(torch.load(model_file))
 
 def exists(val):
     return val is not None
@@ -128,7 +129,7 @@ def train_vae(args, epoch, model_list, loader, optimizer_list, device):
 
     model, vq_layer, dec_pred_atoms, dec_pred_bonds, dec_pred_atoms_chiral = model_list
     optimizer_model, optimizer_model_vq, optimizer_dec_pred_atoms, optimizer_dec_pred_bonds, optimizer_dec_pred_atoms_chiral = optimizer_list
-    
+
     model.train()
     vq_layer.train()
     dec_pred_atoms.train()
@@ -141,19 +142,19 @@ def train_vae(args, epoch, model_list, loader, optimizer_list, device):
     epoch_iter = tqdm(loader, desc="Iteration")
     for step, batch in enumerate(epoch_iter):
         batch = batch.to(device)
-        node_rep = model(batch.x, batch.edge_index, batch.edge_attr) 
+        node_rep = model(batch.x, batch.edge_index, batch.edge_attr)
         e, e_q_loss = vq_layer(batch.x, node_rep)
         pred_node = dec_pred_atoms(e, batch.edge_index, batch.edge_attr)
         pred_node_chiral = dec_pred_atoms_chiral(e, batch.edge_index, batch.edge_attr)
-        atom_loss = criterion(pred_node, batch.x[:, 0]) 
-        atom_chiral_loss = criterion(pred_node_chiral, batch.x[:, 1]) 
+        atom_loss = criterion(pred_node, batch.x[:, 0])
+        atom_chiral_loss = criterion(pred_node_chiral, batch.x[:, 1])
         recon_loss = atom_loss + atom_chiral_loss
 
         if args.edge:
             edge_rep = e[batch.edge_index[0]] + e[batch.edge_index[1]]
             pred_edge = dec_pred_bonds(edge_rep, batch.edge_index, batch.edge_attr)
             recon_loss += criterion(pred_edge, batch.edge_attr[:,0])
-    
+
         loss = recon_loss + e_q_loss
         optimizer_model.zero_grad()
         optimizer_model_vq.zero_grad()
@@ -179,7 +180,7 @@ def train_vae(args, epoch, model_list, loader, optimizer_list, device):
 
 def main():
     parser = argparse.ArgumentParser(description='PyTorch implementation of pre-training of graph neural networks')
-    parser.add_argument('--device', type=int, default=5,
+    parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')
     parser.add_argument('--batch_size', type=int, default=256,
                         help='input batch size for training (default: 256)')
@@ -195,9 +196,9 @@ def main():
     parser.add_argument('--emb_dim', type=int, default=300,
                         help='embedding dimensions (default: 300)')
     parser.add_argument('--num_tokens', type=int, default=512,
-                        help='number of atom tokens (default: 512)') 
+                        help='number of atom tokens (default: 512)')
     parser.add_argument('--commitment_cost', type = float, default = 0.25, help = 'commitment_cost')
-    parser.add_argument('--edge', type=int, default=1, help='whether to decode edges or not together with atoms') 
+    parser.add_argument('--edge', type=int, default=1, help='whether to decode edges or not together with atoms')
 
     parser.add_argument('--dropout_ratio', type=float, default=0.0, help='dropout ratio (default: 0)')
     parser.add_argument('--mask_rate', type=float, default=0.0,
@@ -208,7 +209,7 @@ def main():
     parser.add_argument('--output_model_file', type=str, default = '', help='filename to output the model')
     parser.add_argument('--gnn_type', type=str, default="gin")
     parser.add_argument('--seed', type=int, default=0, help = "Seed for splitting dataset.")
-    parser.add_argument('--num_workers', type=int, default = 8, help='number of workers for dataset loading')
+    parser.add_argument('--num_workers', type=int, default = 2, help='number of workers for dataset loading')
     parser.add_argument('--input_model_file', type=str, default=None)
     parser.add_argument("--decoder", type=str, default="gin")
     parser.add_argument("--use_scheduler", action="store_true", default=True)
@@ -217,15 +218,31 @@ def main():
 
     torch.manual_seed(0)
     np.random.seed(0)
-    device = torch.device("cuda:" + str(args.device)) if torch.cuda.is_available() else torch.device("cpu")
     if torch.cuda.is_available():
+        # Validate device number
+        if args.device >= torch.cuda.device_count():
+            print(f"Warning: Device {args.device} not available. Using device 0 instead.")
+            args.device = 0
+        device = torch.device("cuda:" + str(args.device))
         torch.cuda.manual_seed_all(0)
+    else:
+        device = torch.device("cpu")
 
     print("num layer: %d mask rate: %f mask edge: %d" %(args.num_layer, args.mask_rate, args.edge))
     #set up dataset and transform function.
-    dataset = MoleculeDataset("/root/Mole-BERT-plus/dataset/" + args.dataset, dataset=args.dataset)
+    # Remove old processed files for PyG version compatibility
+    import os
+    dataset_root = "dataset/" + args.dataset
+    processed_dir = os.path.join(dataset_root, "processed")
+    processed_file = os.path.join(processed_dir, "geometric_data_processed.pt")
+
+    if os.path.exists(processed_file):
+        print(f"Removing old processed file for PyG compatibility: {processed_file}")
+        os.remove(processed_file)
+
+    dataset = MoleculeDataset(dataset_root, dataset=args.dataset)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
-    model = DiscreteGNN(args.num_layer, args.emb_dim).to(device)
+    model = DiscreteGNN(args.num_layer, args.emb_dim,args.num_tokens).to(device)
     if args.input_model_file is not None and args.input_model_file != "":
         model.load_state_dict(torch.load(args.input_model_file))
         print("Resume training from:", args.input_model_file)
@@ -243,7 +260,7 @@ def main():
         bond_pred_decoder = None
         optimizer_dec_pred_bonds = None
 
-    model_list = [model, vq_layer, atom_pred_decoder, bond_pred_decoder, atom_chiral_pred_decoder] 
+    model_list = [model, vq_layer, atom_pred_decoder, bond_pred_decoder, atom_chiral_pred_decoder]
     #set up optimizers
     optimizer_model = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.decay)
     optimizer_model_vq = optim.Adam(vq_layer.parameters(), lr=args.lr, weight_decay=args.decay)
@@ -256,14 +273,14 @@ def main():
         scheduler = lambda epoch :( 1 + np.cos((epoch) * np.pi / args.epochs) ) * 0.5
         scheduler_model = torch.optim.lr_scheduler.LambdaLR(optimizer_model, lr_lambda=scheduler)
         scheduler_dec = torch.optim.lr_scheduler.LambdaLR(optimizer_dec_pred_atoms, lr_lambda=scheduler)
-        scheduler_dec_chiral = torch.optim.lr_scheduler.LambdaLR(optimizer_dec_pred_atoms_chiral, lr_lambda=scheduler)        
+        scheduler_dec_chiral = torch.optim.lr_scheduler.LambdaLR(optimizer_dec_pred_atoms_chiral, lr_lambda=scheduler)
         scheduler_list = [scheduler_model, scheduler_dec, scheduler_dec_chiral, None]
     else:
         scheduler_model = None
         scheduler_dec = None
 
     optimizer_list = [optimizer_model, optimizer_model_vq, optimizer_dec_pred_atoms, optimizer_dec_pred_bonds, optimizer_dec_pred_atoms_chiral]
-    output_file = "./checkpoints/" + args.output_model_file   
+    output_file = "./checkpoints/" + args.output_model_file
     for epoch in range(1, args.epochs+1):
         print("====epoch " + str(epoch))
         train_loss = train_vae(args, epoch, model_list, loader, optimizer_list, device)
