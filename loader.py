@@ -272,8 +272,8 @@ class MyDataset(InMemoryDataset):
     def __getitem__(self, idx):
         dataA = Data()
         dataB = Data()
-        for key in self.data.keys:
-            item, slices = self.data[key], self.slices[key]
+        for key in self._data.keys:
+            item, slices = self._data[key], self.slices[key]
             s = list(repeat(slice(None), item.dim()))
             s[data.__cat_dim__(key, item)] = slice(slices[idx],
                                                     slices[idx + 1])
@@ -318,10 +318,10 @@ class MoleculeDataset(InMemoryDataset):
     def get(self, idx):
         data = Data()
         # data_masked = self.transform(data)
-        # print('data', self.data.edge_index)
+        # print('data', self._data.edge_index)
         # print('slices', self.slices)
-        for key in self.data.keys:
-            item, slices = self.data[key], self.slices[key]
+        for key in self._data.keys:
+            item, slices = self._data[key], self.slices[key]
             s = list(repeat(slice(None), item.dim()))
             s[data.__cat_dim__(key, item)] = slice(slices[idx],
                                                     slices[idx + 1])
