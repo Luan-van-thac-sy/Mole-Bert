@@ -22,7 +22,7 @@ from torch_geometric.nn import global_add_pool, global_mean_pool, global_max_poo
 from tensorboardX import SummaryWriter
 import timeit
 
-triplet_loss = nn.TripletMarginLoss(margin=0.0, p=2)
+triplet_loss = nn.TripletMarginLoss(margin=1e-6, p=2)
 criterion = nn.CrossEntropyLoss()
 
 class graphcl(nn.Module):
@@ -57,7 +57,7 @@ class graphcl(nn.Module):
 
 class VectorQuantizer(nn.Module):
     """
-    VQ-VAE layer: Input any tensor to be quantized. 
+    VQ-VAE layer: Input any tensor to be quantized.
     Args:
         embedding_dim (int): the dimensionality of the tensors in the
           quantized space. Inputs to the modules must be in this format as well.
@@ -69,15 +69,15 @@ class VectorQuantizer(nn.Module):
         self.embedding_dim = embedding_dim
         self.num_embeddings = num_embeddings
         self.commitment_cost = commitment_cost
-        
+
         # initialize embeddings
         self.embeddings = nn.Embedding(self.num_embeddings, self.embedding_dim)
-        
+
     def forward(self, x):
-        encoding_indices = self.get_code_indices(x) 
+        encoding_indices = self.get_code_indices(x)
         print(encoding_indices[:5])
         quantized = self.quantize(encoding_indices)
-        quantized = quantized.view_as(x) 
+        quantized = quantized.view_as(x)
         # embedding loss: move the embeddings towards the encoder's output
         q_latent_loss = F.mse_loss(quantized, x.detach())
         # commitment loss
@@ -87,7 +87,7 @@ class VectorQuantizer(nn.Module):
         quantized = x + (quantized - x).detach().contiguous()
 
         return quantized, loss
-    
+
     def get_code_indices(self, flat_x):
         # compute L2 distance
         distances = (
@@ -97,7 +97,7 @@ class VectorQuantizer(nn.Module):
         ) # [N, M]
         encoding_indices = torch.argmin(distances, dim=1) # [N,]
         return encoding_indices
-    
+
     def quantize(self, encoding_indices):
         """Returns embedding tensor for a batch of indices."""
         return self.embeddings(encoding_indices)
@@ -138,8 +138,8 @@ def train(args, epoch, model_list, tokenizer, dataset, optimizer_list, device):
             batch_origin_x = copy.deepcopy(batch1.x)
             batch_origin_x[batch1.masked_atom_indices] = batch1.mask_node_label
             batch_origin_edge = copy.deepcopy(batch1.edge_attr)
-            batch_origin_edge[batch1.connected_edge_indices] = batch1.mask_edge_label   
-            batch_origin_edge[batch1.connected_edge_indices + 1] = batch1.mask_edge_label         
+            batch_origin_edge[batch1.connected_edge_indices] = batch1.mask_edge_label
+            batch_origin_edge[batch1.connected_edge_indices + 1] = batch1.mask_edge_label
             atom_ids = tokenizer.get_codebook_indices(batch_origin_x, batch1.edge_index, batch_origin_edge)
             labels1 = atom_ids[batch1.masked_atom_indices]
             labels2 = atom_ids[batch2.masked_atom_indices]
@@ -211,7 +211,7 @@ def main():
     parser.add_argument('--emb_dim', type=int, default=300,
                         help='embedding dimensions (default: 300)')
     parser.add_argument('--num_tokens', type=int, default=512,
-                        help='number of atom tokens (default: 512)') 
+                        help='number of atom tokens (default: 512)')
     parser.add_argument("--epochth", type=int, default=60)
     parser.add_argument("--edge", type=int, default=1)
     parser.add_argument('--dropout_ratio', type=float, default=0,
@@ -238,7 +238,7 @@ def main():
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(0)
 
-    dataset = MoleculeDataset("./dataset/" + args.dataset, dataset=args.dataset) 
+    dataset = MoleculeDataset("./dataset/" + args.dataset, dataset=args.dataset)
     gnn = GNN(args.num_layer, args.emb_dim, JK = args.JK, drop_ratio = args.dropout_ratio, gnn_type = args.gnn_type)
     model = graphcl(gnn).to(device)
     codebook = VectorQuantizer(args.emb_dim, args.num_tokens, commitment_cost = 0.25).to(device)
@@ -270,9 +270,9 @@ def main():
         train_loss, train_acc_atom, train_acc_bond = train(args, epoch, model_list, tokenizer, dataset, optimizer_list, device)
         print(train_loss, train_acc_atom, train_acc_bond)
         train_loss_list.append(train_loss)
-        train_acc_list.append(train_acc_atom)    
+        train_acc_list.append(train_acc_atom)
     df = pd.DataFrame({'train_acc':train_acc_list,'train_loss':train_loss_list})
-    df.to_csv('./logs/logs.csv')   
+    df.to_csv('./logs/logs.csv')
 
     if not args.output_model_file == "":
         torch.save(model.gnn.state_dict(), args.output_model_file + f"Mole-BERT.pth")

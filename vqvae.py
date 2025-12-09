@@ -98,7 +98,7 @@ class VectorQuantizer(nn.Module):
         return self.embeddings(encoding_indices)
 
     def from_pretrained(self, model_file):
-        self.load_state_dict(torch.load(model_file))
+        self.load_state_dict(torch.load(model_file, weights_only=False))
 
 def exists(val):
     return val is not None
@@ -244,7 +244,7 @@ def main():
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers = args.num_workers)
     model = DiscreteGNN(args.num_layer, args.emb_dim,args.num_tokens).to(device)
     if args.input_model_file is not None and args.input_model_file != "":
-        model.load_state_dict(torch.load(args.input_model_file))
+        model.load_state_dict(torch.load(args.input_model_file, weights_only=False))
         print("Resume training from:", args.input_model_file)
         resume = True
     else:

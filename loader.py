@@ -262,7 +262,7 @@ class MyDataset(InMemoryDataset):
     def __init__(self, datasetA, datasetB):
         self.datasetA = datasetA
         self.datasetB = datasetB
-        self.data, self.slices = torch.load(self.processed_paths[0])
+        self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
     # def __getitem__(self, index):
     #     xA = self.datasetA[index]
     #     xB = self.datasetB[index]
@@ -280,7 +280,7 @@ class MyDataset(InMemoryDataset):
             dataA[key] = item[s]
             dataB[key] = item[s]
         return dataA, dataB
-    
+
     def __len__(self):
         return len(self.datasetA)
 
@@ -312,7 +312,7 @@ class MoleculeDataset(InMemoryDataset):
         self.transform, self.pre_transform, self.pre_filter = transform, pre_transform, pre_filter
 
         if not empty:
-            self.data, self.slices = torch.load(self.processed_paths[0])
+            self.data, self.slices = torch.load(self.processed_paths[0], weights_only=False)
 
 
     def get(self, idx):
@@ -390,7 +390,7 @@ class MoleculeDataset(InMemoryDataset):
             ### get downstream test molecules.
             from splitters import scaffold_split
 
-            ### 
+            ###
             downstream_dir = [
             'dataset/bace',
             'dataset/bbbp',
@@ -757,7 +757,7 @@ class MoleculeDataset(InMemoryDataset):
                     data.y = torch.tensor([labels[i]])
                     data_list.append(data)
                     data_smiles_list.append(smiles_list[i])
-                    
+
 
         else:
             raise ValueError('Invalid dataset name')
