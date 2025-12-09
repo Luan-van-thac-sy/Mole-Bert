@@ -232,7 +232,7 @@ def main():
     #set up dataset and transform function.
     # Remove old processed files for PyG version compatibility
     import os
-    dataset_root = "/kaggle/input/mole-bert-dataset/dataset/" + args.dataset
+    dataset_root = "dataset/" + args.dataset
     processed_dir = os.path.join(dataset_root, "processed")
     processed_file = os.path.join(processed_dir, "geometric_data_processed.pt")
 
